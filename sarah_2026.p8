@@ -2,22 +2,92 @@ pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
 p = {}
+state_initial=1
+state_dancing=2
+state_moving=3
+state=state_initial
+state_last=-1
+state_timer=0
+main_messagey=-20
+message=1
+messages={
+"",
+"message 1",
+"message 2",
+"message 3"
+}
+positions={
+ {60,80},
+ {20,60},
+ {20,80},
+ {60,60}
+}
+position=1
 
 function _init()
  p = make_sarah(-4,80)
- move_sarah(p,60,p.y)
- dance_sarah(p,true)
+ local pos = positions[position]
+ move_sarah(p,pos[1],pos[2])
+ position+=1
 end
 
 function _update()
 	update_sarah(p)
+ state_timer+=1
+	
+ local firsttime = state ~= state_last
+ state_last = state
+ 
+ if state == state_initial then
+  if not p.moving then
+   state=state_dancing
+   music(0)
+  end
+ elseif state == state_dancing then
+  if firsttime then
+   dance_sarah(p,true)
+   state_timer=0
+  else
+   if main_messagey < 8 then
+    main_messagey+=0.2
+   elseif state_timer >= 30 * 5 then
+    state=state_moving
+    move_sarah(p,20,p.x)
+    message+=1
+    if message > #messages then message=1 end
+   end
+  end
+ elseif state == state_moving then
+  if firsttime then
+		 local pos = positions[position]
+		 move_sarah(p,pos[1],pos[2])
+		 position+=1
+		 if position > #positions then position=1 end
+  else
+	  if not p.moving then
+	   state=state_dancing
+	  end
+  end
+ end
+ 
 end
 
 function _draw()
  cls()
+ --rect(0,0,127,127,3)
+ 
 	draw_sarah(p)
- rect(0,0,127,127,3)
- draw_main_text(0,8)
+	
+ if state ~= state_initial then
+  draw_main_text(0,main_messagey)
+ end
+ 
+ if state == state_initial then
+ 	
+ elseif state == state_dancing then
+  print(messages[message],10,50)
+ elseif state == state_moving then
+ end
 end
 -->8
 function make_sarah(x,y)
@@ -30,34 +100,36 @@ function make_sarah(x,y)
  a.sprtmrmax = 15
  a.destx = a.x
  a.desty = a.y
+ a.dancing = false
+ a.moving = false
  return a
 end
 
 function update_sarah(a)
- local moving = false
+ a.moving = false
 	if (a.x < a.destx) then
 	 a.x = a.x + 1
-	 moving = true
+	 a.moving = true
 	end
 	if (a.x > a.destx) then
 	 a.x = a.x - 1
-	 moving = true
+	 a.moving = true
 	end
 	if (a.y < a.desty) then
 	 a.y = a.y + 1
-	 moving = true
+	 a.moving = true
 	end
 	if (a.y > a.desty) then
 	 a.y = a.y - 1
-	 moving = true
+	 a.moving = true
 	end
 	
-	if moving or a.dancing then
+	if a.dancing then
 	 a.sprtmr = a.sprtmr + 1
 	 if a.sprtmr >= a.sprtmrmax then
 	  a.sprtmr = 1
 	  a.sprindex = a.sprindex + 1
-	  if a.sprindex > count(a.sprtab) then
+	  if a.sprindex > #a.sprtab then
 	   a.sprindex = 1
 	  end
 	 end
@@ -139,3 +211,15 @@ __gfx__
 07777770077777700777770007777700077777700000000007700770000770000777770000077000077777700770077007777770077777700000000000000000
 07700770077007700770000007700000000007700000000007700770000770000770070000077000077007700770077007700770000007700000000000000000
 07700770077007700770000007700000077777700000000007777700000770000770077000077000077007700777770007700770077777700000000000000000
+__sfx__
+000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0010180018070180700000018070000001a0701a0701a070180001807018050180501d0001d0501d0501d0501c0001c0501c0501c0501c0501c05000000000000000000000000000000000000000000000000000
+0010180018070180700000018070000001a0701a0701a070180001807018050180501d0001f0501f0501f0501c0001d0501d0501d0501d0501d0500000000000000001a0001a0001800000000000000000000000
+00101d001807018070000001807000000240702407024070180002107021050210501d0001d0501d0501d0501c0001c0501c0501c0501b0001a0501a0501a0501a0501a0501a0501a05000000000000000000000
+00100000220502205022000220502205000000210502105021050000001d0501d0501d050000001f0501f0501f050000001d0501d0501d0501d0501d0501d0500000000000000000000000000000000000000000
+__music__
+01 01424344
+00 02424344
+00 03424344
+02 04424344
+
