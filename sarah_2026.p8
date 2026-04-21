@@ -15,10 +15,13 @@ messages={
 "happy 40th birthday",
 "we love you mum",
 "enjoy the balloons",
+"sarah is the best",
 "have a fun day",
+"we love you playing with me",
 "enjoy your presents",
 "you look beautiful",
 "you are a fun mum",
+"we love your kisses and hugs",
 "enjoy the music"
 }
 positions={
