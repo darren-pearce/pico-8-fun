@@ -2,7 +2,8 @@ pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
 --engine
-p1={}
+p1=nil
+p2=nil
 
 --globals
 g=
@@ -371,7 +372,10 @@ function build_dynamic_items()
 	  sprite = mget(mapx,mapy)
 	  if sprite == 1 then
  	  mset(mapx,mapy,0)
- 	  p1=make_player(mapx,mapy)
+	   if p1==nil then p1=make_player(mapx,mapy)
+	   elseif p2==nil then p2=make_player(mapx,mapy)
+	   else assert(false, "too many player sprites")
+	   end
 	  elseif sprite == 4 then
  	  mset(mapx,mapy,0)
 				add(enemies,make_enemy1(mapx,mapy))
