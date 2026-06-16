@@ -2,8 +2,9 @@ pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
 --engine
-p1=nil
-p2=nil
+
+-- todo decide on end game state
+-- atm its gameover when p1 is dead
 
 --globals
 g=
@@ -26,6 +27,7 @@ c=
  y=0
 }
 
+players={}
 keys={}
 enemies={}
 
@@ -34,19 +36,25 @@ function _init()
 end
 
 function _update()
- player_update(p1)
+	foreach(players, player_update)
  foreach(enemies, enemy_update)
+end
+
+function all_players_dead()
+ local alldead=true
+	foreach(players, function (p) if not p.isdead then alldead=false end end)
+	return alldead
 end
 
 function _draw()
  cls() --clear the screen
  camera(c.x, c.y)
  map()
- actor_draw(p1)
+	foreach(players, actor_draw)
  foreach(enemies, actor_draw)
  foreach(keys, actor_draw)
  	
- if p1.isdead then
+ if all_players_dead() then
   print("game over",c.x+50,c.y+60,8)
  end
  if g.finished then
@@ -70,8 +78,8 @@ end
 
 function player_jump(p)
  --if on the ground and the
- --user presses x,c,or,up...
- local jumppressednew = (btn(2) or btn(4) or btn(5))
+ --user presses up...
+ local jumppressednew = (btn(2,p.player))
  if jumppressednew and not p.jumppressed then
   if p.isgrounded then
    p.dy=-p.jumpvel
@@ -130,23 +138,23 @@ function player_update(p)
  if g.finished then return end
  
  --remember where we started
- local startx=p1.x
+ local startx=p.x
  
- player_jump(p1)
+ player_jump(p)
    
  --walk
  --
    
- p1.dx=0
- if btn(0) then --left
-  p1.dx=-2
+ p.dx=0
+ if btn(0,p.player) then --left
+  p.dx=-2
  end
- if btn(1) then --right
-  p1.dx=2
+ if btn(1,p.player) then --right
+  p.dx=2
  end
    
  --move the player left/right
- p1.x+=p1.dx
+ p.x+=p.dx
    
  --hit side walls
  --
@@ -154,100 +162,100 @@ function player_update(p)
  --check for walls in the
  --direction we are moving.
  local xoffset=0
- if p1.dx>0 then xoffset=7 end
+ if p.dx>0 then xoffset=7 end
    
  --look for a wall
- local h=mget((p1.x+xoffset)/8,(p1.y+7)/8)
+ local h=mget((p.x+xoffset)/8,(p.y+7)/8)
  if fget(h,0) then
   --they hit a wall so move them
   --back to their original pos.
   --it should really move them to
   --the edge of the wall but this
   --mostly works and is simpler.
-  p1.x=startx
+  p.x=startx
  end
    
  --accumulate gravity
- p1.dy+=g.grav
- if p1.dy > g.maxdy then p1.dy=g.maxdy end
+ p.dy+=g.grav
+ if p.dy > g.maxdy then p.dy=g.maxdy end
    
   --fall
-  p1.y+=p1.dy
+  p.y+=p.dy
 
   --hit floor
   --
    
   --check bottom center of the
   --player.
-  local v=mget((p1.x+4)/8,(p1.y+8)/8)
+  local v=mget((p.x+4)/8,(p.y+8)/8)
    
   --assume they are floating 
   --until we determine otherwise
-  p1.isgrounded=false
+  p.isgrounded=false
    
   --only check for floors when
   --moving downward
-  if p1.dy>=0 then
+  if p.dy>=0 then
    --look for a solid tile
    if fget(v,0) then
-    --place p1 on top of tile
-    p1.y = flr((p1.y)/8)*8
+    --place player on top of tile
+    p.y = flr((p.y)/8)*8
     --halt velocity
-    p1.dy = 0
+    p.dy = 0
     --allow jumping again
-    p1.isgrounded=true
+    p.isgrounded=true
    end
   end
    
   --hit ceiling
   --
    
-  --check top center of p1
-  v=mget((p1.x+4)/8,(p1.y)/8)
+  --check top center of player
+  v=mget((p.x+4)/8,(p.y)/8)
    
   --only check for ceilings when
   --moving up
-  if p1.dy<=0 then
+  if p.dy<=0 then
    --look for solid tile
    if fget(v,0) then
-    --position p1 right below
+    --position player right below
     --ceiling
-    p1.y = flr((p1.y+8)/8)*8
+    p.y = flr((p.y+8)/8)*8
     --halt upward velocity
-    p1.dy = 0
+    p.dy = 0
    end
   end
   
-  check_flower_collision()
+  check_flower_collision(p)
    
-  foreach(enemies, check_enemy_collision)
+  foreach(enemies, function(e) check_enemy_collision(p, e) end)
     
   -- move the camera to another screen if necessary
-  if p1.y>=(c.y+g.camshft) then c.y+=g.camshft end
-  if p1.y<(c.y) then c.y-=g.camshft end
-  if p1.x>=(c.x+g.camshft) then c.x+=g.camshft end
-  if p1.x<(c.x) then c.x-=g.camshft end
+  if p.y>=(c.y+g.camshft) then c.y+=g.camshft end
+  if p.y<(c.y) then c.y-=g.camshft end
+  if p.x>=(c.x+g.camshft) then c.x+=g.camshft end
+  if p.x<(c.x) then c.x-=g.camshft end
   
-  for i=1,#keys do key_check_collision(keys[i],p1) end
-  player_anim(p1)
-  p1.isgrounded_last=p1.isgrounded
+  for i=1,#keys do key_check_collision(keys[i],p) end
+  player_anim(p)
+  p.isgrounded_last=p.isgrounded
 end
 
-function check_enemy_collision(e)
- if items_colliding(p1,e) then
-   p1.isdead=true
+function check_enemy_collision(p,e)
+ if items_colliding(p,e) then
+   p.isdead=true
  end
 end
 
-function check_flower_collision()
- tile=mget((p1.x+4)/8,(p1.y+4)/8)
+function check_flower_collision(p)
+ tile=mget((p.x+4)/8,(p.y+4)/8)
   
  if tile == 20 then
-  mset((p1.x+4)/8,(p1.y+4)/8,0)
-  p1.flowers_found += 1
+  mset((p.x+4)/8,(p.y+4)/8,0)
+  p.flowers_found += 1
  end
  
- if p1.flowers_found == g.max_flowers then
+ if p.flowers_found == g.max_flowers then
   g.finished = true
  end
 end
@@ -303,7 +311,7 @@ function enemy_update(e)
   if e.dy>=0 then
    --look for a solid tile
    if fget(v,0) then
-    --place p1 on top of tile
+    --place player on top of tile
     e.y = flr((e.y)/8)*8
     --halt velocity
     e.dy = 0
@@ -315,7 +323,7 @@ function enemy_update(e)
   --hit ceiling
   --
    
-  --check top center of p1
+  --check top center of player
   v=mget((e.x+4)/8,(e.y)/8)
    
   --only check for ceilings when
@@ -323,7 +331,7 @@ function enemy_update(e)
   if e.dy<=0 then
    --look for solid tile
    if fget(v,0) then
-    --position p1 right below
+    --position player right below
     --ceiling
     e.y = flr((e.y+8)/8)*8
     --halt upward velocity
@@ -347,7 +355,9 @@ end
 
 function actor_draw(a)
  if a.is_shown then
+  pal(a.colours)
   spr(a.spr_table[a.spr_index],a.x,a.y,1,1,a.spr_reverse)
+  pal()
  end
 end
 
@@ -372,10 +382,7 @@ function build_dynamic_items()
 	  sprite = mget(mapx,mapy)
 	  if sprite == 1 then
  	  mset(mapx,mapy,0)
-	   if p1==nil then p1=make_player(mapx,mapy)
-	   elseif p2==nil then p2=make_player(mapx,mapy)
-	   else assert(false, "too many player sprites")
-	   end
+ 	  add(players, make_player(mapx,mapy))
 	  elseif sprite == 4 then
  	  mset(mapx,mapy,0)
 				add(enemies,make_enemy1(mapx,mapy))
@@ -425,6 +432,7 @@ function make_actor(mapx,mapy)
   -- used to detect if the player can jump
   isgrounded=false,
   isgrounded_last=true,
+	 colours={},
 	}
 end
 
@@ -440,6 +448,12 @@ function make_player(mapx,mapy)
 	a.jumppressed=false
 	a.isdead=false
 	a.flowers_found=0
+	a.player=#players
+	if (a.player == 0) then
+	 a.colours={}
+	elseif (a.player==1) then
+	 a.colours={[8]=12,[12]=8}
+	end
 	return a
 end
 
@@ -529,7 +543,7 @@ __map__
 000f0000000000000f000f00000f0000000f00000000000000000f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000f00000000000f00000000000f0000000000000000000000000f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000f000f0f0f0f0000000000000f000f000000000000000000000f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000f00000000000001000000000f00000f0000000000000000000f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000f00000000000001000001000f00000f0000000000000000000f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
 000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
